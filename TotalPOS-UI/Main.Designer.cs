@@ -9,12 +9,15 @@
             this.colName = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colCreatedAt = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colTotal = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.colTotale = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.colOpen = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.btnApri = new System.Windows.Forms.Button();
             this.btnNuovo = new System.Windows.Forms.Button();
             this.btnCancellare = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
-            this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.txtCode = new System.Windows.Forms.TextBox();
+            this.txtSearch = new System.Windows.Forms.TextBox();
+            this.btnInsieme = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // listViewTavolo
@@ -24,7 +27,8 @@
             this.colName,
             this.colCreatedAt,
             this.colTotal,
-            this.columnHeader1});
+            this.colTotale,
+            this.colOpen});
             this.listViewTavolo.FullRowSelect = true;
             this.listViewTavolo.GridLines = true;
             this.listViewTavolo.HideSelection = false;
@@ -34,7 +38,6 @@
             this.listViewTavolo.TabIndex = 0;
             this.listViewTavolo.UseCompatibleStateImageBehavior = false;
             this.listViewTavolo.View = System.Windows.Forms.View.Details;
-            this.listViewTavolo.SelectedIndexChanged += new System.EventHandler(this.listViewTavolo_SelectedIndexChanged);
             // 
             // colId
             // 
@@ -56,9 +59,19 @@
             this.colTotal.Text = "Total";
             this.colTotal.Width = 100;
             // 
+            // colTotale
+            // 
+            this.colTotale.Text = "Totale product";
+            this.colTotale.Width = 100;
+            // 
+            // colOpen
+            // 
+            this.colOpen.Text = "Open";
+            this.colOpen.Width = 50;
+            // 
             // btnApri
             // 
-            this.btnApri.Location = new System.Drawing.Point(649, 54);
+            this.btnApri.Location = new System.Drawing.Point(649, 106);
             this.btnApri.Name = "btnApri";
             this.btnApri.Size = new System.Drawing.Size(119, 46);
             this.btnApri.TabIndex = 1;
@@ -68,7 +81,7 @@
             // 
             // btnNuovo
             // 
-            this.btnNuovo.Location = new System.Drawing.Point(649, 162);
+            this.btnNuovo.Location = new System.Drawing.Point(649, 200);
             this.btnNuovo.Name = "btnNuovo";
             this.btnNuovo.Size = new System.Drawing.Size(119, 43);
             this.btnNuovo.TabIndex = 2;
@@ -96,22 +109,37 @@
             this.label1.TabIndex = 4;
             this.label1.Text = "Ristorante";
             // 
-            // columnHeader1
+            // txtCode
             // 
-            this.columnHeader1.Text = "Totale product";
-            this.columnHeader1.Width = 150;
+            this.txtCode.Location = new System.Drawing.Point(649, 174);
+            this.txtCode.Name = "txtCode";
+            this.txtCode.Size = new System.Drawing.Size(119, 20);
+            this.txtCode.TabIndex = 5;
             // 
-            // textBox1
+            // txtSearch
             // 
-            this.textBox1.Location = new System.Drawing.Point(216, 19);
-            this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(185, 20);
-            this.textBox1.TabIndex = 5;
+            this.txtSearch.Location = new System.Drawing.Point(191, 19);
+            this.txtSearch.Name = "txtSearch";
+            this.txtSearch.Size = new System.Drawing.Size(299, 20);
+            this.txtSearch.TabIndex = 6;
+            this.txtSearch.KeyUp += new System.Windows.Forms.KeyEventHandler(this.txtSearch_KeyUp);
+            // 
+            // btnInsieme
+            // 
+            this.btnInsieme.Location = new System.Drawing.Point(649, 54);
+            this.btnInsieme.Name = "btnInsieme";
+            this.btnInsieme.Size = new System.Drawing.Size(119, 46);
+            this.btnInsieme.TabIndex = 7;
+            this.btnInsieme.Text = "Mettere insieme";
+            this.btnInsieme.UseVisualStyleBackColor = true;
+            this.btnInsieme.Click += new System.EventHandler(this.btnInsieme_Click);
             // 
             // Main
             // 
             this.ClientSize = new System.Drawing.Size(799, 343);
-            this.Controls.Add(this.textBox1);
+            this.Controls.Add(this.btnInsieme);
+            this.Controls.Add(this.txtSearch);
+            this.Controls.Add(this.txtCode);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.btnCancellare);
             this.Controls.Add(this.btnNuovo);
@@ -134,7 +162,10 @@
         private System.Windows.Forms.Button btnNuovo;
         private System.Windows.Forms.Button btnCancellare;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.ColumnHeader columnHeader1;
-        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.ColumnHeader colTotale;
+        private System.Windows.Forms.TextBox txtCode;
+        private System.Windows.Forms.TextBox txtSearch;
+        private System.Windows.Forms.Button btnInsieme;
+        private System.Windows.Forms.ColumnHeader colOpen;
     }
 }

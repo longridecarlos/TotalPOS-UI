@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Reflection.Emit;
+using System.Security.Cryptography;
 using Newtonsoft.Json;
 using OpenTable.Models;
 
@@ -18,24 +20,26 @@ namespace OpenTable
 
                 string createTablesQuery = @"
                 CREATE TABLE IF NOT EXISTS sync_opentable (
-                    ot_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ot_name TEXT NOT NULL,
-                    ot_created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    ot_total REAL DEFAULT 0
-                );
+                ot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ot_name TEXT NOT NULL,
+                ot_code TEXT NOT NULL UNIQUE,
+                ot_created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ot_total REAL DEFAULT 0,
+                ot_is_open NUMERIC DEFAULT 0
+            );
 
                 CREATE TABLE IF NOT EXISTS sync_opentable_items (
-                    oti_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    oti_table_id INTEGER NOT NULL,
-                    oti_created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    oti_product_id INTEGER NOT NULL,
-                    oti_qty INTEGER NOT NULL,
-                    oti_amount REAL NOT NULL,
-                    oti_total REAL GENERATED ALWAYS AS (oti_qty * oti_amount) VIRTUAL,
-                    oti_serialized TEXT NOT NULL,
-                    FOREIGN KEY (oti_table_id) REFERENCES sync_opentable (ot_id)
-                );
-            ";
+                oti_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                oti_table_id INTEGER NOT NULL,
+                oti_created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                oti_product_id INTEGER NOT NULL,
+                oti_qty INTEGER NOT NULL,
+                oti_amount REAL NOT NULL,
+                oti_total REAL GENERATED ALWAYS AS (oti_qty * oti_amount) VIRTUAL,
+                oti_serialized TEXT NOT NULL,
+                FOREIGN KEY (oti_table_id) REFERENCES sync_opentable (ot_id)
+            );
+        ";
 
                 using (SQLiteCommand command = new SQLiteCommand(createTablesQuery, connection))
                 {
@@ -44,13 +48,17 @@ namespace OpenTable
             }
         }
 
+
         public static List<Table> GetAllTables()
         {
             List<Table> tables = new List<Table>();
             using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
             {
                 connection.Open();
-                string query = "SELECT ot_id, ot_name, ot_created_at, ot_total, (SELECT SUM(oti_qty) FROM sync_opentable_items WHERE oti_table_id = ot_id) AS TotalArt FROM sync_opentable;";
+                string query = "SELECT ot_id, ot_name, ot_code, ot_created_at, ot_total, " +
+               "(SELECT SUM(oti_qty) FROM sync_opentable_items WHERE oti_table_id = ot_id) AS TotalArt, " +
+               "ot_is_open FROM sync_opentable;";
+
                 using (SQLiteCommand command = new SQLiteCommand(query, connection))
                 {
                     using (SQLiteDataReader reader = command.ExecuteReader())
@@ -61,10 +69,13 @@ namespace OpenTable
                             {
                                 Id = reader.GetInt32(0),
                                 Name = reader.GetString(1),
-                                CreatedAt = reader.GetDateTime(2),
-                                Total = reader.GetDouble(3),
-                                TotalArt = reader.IsDBNull(4) ? 0 : reader.GetInt32(4)
+                                Code = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                CreatedAt = reader.GetDateTime(3),
+                                Total = reader.GetDouble(4),
+                                TotalArt = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                                IsOpen = reader.GetInt32(6) == 1
                             });
+
                         }
                     }
                 }
@@ -72,48 +83,52 @@ namespace OpenTable
             return tables;
         }
 
-        public static double prueba(int id)
+
+        public static void SaveNewTable(string tableName, string code)
         {
-            double total = 0.0;
+            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
+            {
+                connection.Open();
+                string query = "INSERT INTO sync_opentable (ot_name, ot_code, ot_is_open) VALUES (@name, @code, 1)";
+                using (SQLiteCommand command = new SQLiteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@name", tableName);
+                    command.Parameters.AddWithValue("@code", code);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+
+        public static Table GetTable(string code)
+        {
+            Table table = null;
 
             using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
             {
                 connection.Open();
-                string query = "SELECT ot_total FROM sync_opentable WHERE ot_id=@id;";
-
+                string query = "SELECT ot_id, ot_name, ot_code, ot_created_at, ot_total FROM sync_opentable WHERE ot_code=@code";
                 using (SQLiteCommand command = new SQLiteCommand(query, connection))
                 {
-                    // Usamos el parámetro correcto para evitar inyecciones SQL
-                    command.Parameters.AddWithValue("@id", id);
-
+                    command.Parameters.AddWithValue("@code", code);
                     using (SQLiteDataReader reader = command.ExecuteReader())
                     {
-                        // Si hay resultados, leemos el valor de 'ot_total'
                         if (reader.Read())
                         {
-                            // Si 'ot_total' es NULL, devolvemos 0.0
-                            total = reader.IsDBNull(reader.GetOrdinal("ot_total")) ? 0.0 : reader.GetDouble(reader.GetOrdinal("ot_total"));
+                            table = new Table
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("ot_id")),
+                                Name = reader.GetString(reader.GetOrdinal("ot_name")),
+                                Code = reader.GetString(reader.GetOrdinal("ot_code")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("ot_created_at")),
+                                Total = reader.GetDouble(reader.GetOrdinal("ot_total"))
+                            };
                         }
                     }
                 }
             }
 
-            return total;
-        }
-
-
-        public static void SaveNewTable(string tableName)
-        {
-            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
-            {
-                connection.Open();
-                string query = "INSERT INTO sync_opentable (ot_name) VALUES (@name)";
-                using (SQLiteCommand command = new SQLiteCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@name", tableName);
-                    command.ExecuteNonQuery();
-                }
-            }
+            return table;
         }
 
         public static List<Product> GetTableProducts(int tableId)
@@ -148,7 +163,7 @@ namespace OpenTable
             {
                 connection.Open();
 
-                // Eliminar los productos asociados a la mesa
+                // Remove products associated with the table
                 string deleteItemsQuery = "DELETE FROM sync_opentable_items WHERE oti_table_id = @id";
                 using (SQLiteCommand command = new SQLiteCommand(deleteItemsQuery, connection))
                 {
@@ -156,7 +171,7 @@ namespace OpenTable
                     command.ExecuteNonQuery();
                 }
 
-                // Eliminar la mesa
+                // Delete table
                 string deleteTableQuery = "DELETE FROM sync_opentable WHERE ot_id = @id";
                 using (SQLiteCommand command = new SQLiteCommand(deleteTableQuery, connection))
                 {
@@ -172,7 +187,7 @@ namespace OpenTable
             {
                 connection.Open();
 
-                // Eliminar los elementos asociados al producto
+                // Delete items associated with the product
                 string deleteItemsQuery = "DELETE FROM sync_opentable_items WHERE oti_product_id = @id";
                 using (SQLiteCommand command = new SQLiteCommand(deleteItemsQuery, connection))
                 {
@@ -200,11 +215,13 @@ namespace OpenTable
             }
         }
 
-        public static void UpdateProductQuantity(int tableId, int productId, int quantity)
+        /*public static void UpdateProductQuantity(int tableId, int productId, int quantity)
         {
             using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
             {
                 connection.Open();
+
+                
                 string updateQuery = @"UPDATE sync_opentable_items SET oti_qty = @quantity WHERE oti_table_id = @tableId AND oti_product_id = @productId";
                 using (SQLiteCommand command = new SQLiteCommand(updateQuery, connection))
                 {
@@ -214,7 +231,7 @@ namespace OpenTable
                     command.ExecuteNonQuery();
                 }
             }
-        }
+        }*/
 
         public static void DeleteTableProducts(int tableId)
         {
@@ -230,6 +247,39 @@ namespace OpenTable
             }
         }
 
+        public static void DeleteProductFromTable(int tableId, string productName)
+        {
+            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
+            {
+                connection.Open();
+                string deleteProductQuery = "DELETE FROM sync_opentable_items WHERE oti_table_id = @tableId AND oti_product_name = @productName";
+                using (SQLiteCommand command = new SQLiteCommand(deleteProductQuery, connection))
+                {
+                    command.Parameters.AddWithValue("@tableId", tableId);
+                    command.Parameters.AddWithValue("@productName", productName);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public static void UpdateProductQuantityInTable(int tableId, string productName, int newQuantity)
+        {
+            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
+            {
+                connection.Open();
+                string updateQuantityQuery = "UPDATE sync_opentable_items SET oti_quantity = @quantity WHERE oti_table_id = @tableId AND oti_product_name = @productName";
+                using (SQLiteCommand command = new SQLiteCommand(updateQuantityQuery, connection))
+                {
+                    command.Parameters.AddWithValue("@quantity", newQuantity);
+                    command.Parameters.AddWithValue("@tableId", tableId);
+                    command.Parameters.AddWithValue("@productName", productName);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+
+
         public static void UpdateTableTotal(int tableId, double total)
         {
             using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
@@ -244,6 +294,38 @@ namespace OpenTable
                 }
             }
         }
+
+        public static void UpdateIsOpen(int tableId)
+        {
+            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
+            {
+                connection.Open();
+                string updateQuery = "UPDATE sync_opentable SET ot_is_open = 0, ot_total_art=0, ot_total=0 WHERE ot_id = @tableId";
+                using (SQLiteCommand command = new SQLiteCommand(updateQuery, connection))
+                {
+                    command.Parameters.AddWithValue("@tableId", tableId);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public static void UpdateTableTotalArt(int tableId, int totalArt)
+        {
+            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
+            {
+                connection.Open();
+                string query = "UPDATE sync_opentable SET ot_total_art = @TotalArt WHERE ot_id = @TableId";
+                using (SQLiteCommand command = new SQLiteCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@TotalArt", totalArt);
+                    command.Parameters.AddWithValue("@TableId", tableId);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+
+
 
         /*public static double GetTableTotal(int tableId)
         {
@@ -292,20 +374,20 @@ namespace OpenTable
             return totalItems;
         }*/
 
-        public static void UpdateTableItems(int tableId, int totalItems)
-        {
-            using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
-            {
-                connection.Open();
-                string updateQuery = "UPDATE sync_opentable SET ot_total = @totalItems WHERE ot_id = @tableId";
-                using (SQLiteCommand command = new SQLiteCommand(updateQuery, connection))
-                {
-                    command.Parameters.AddWithValue("@totalItems", totalItems);
-                    command.Parameters.AddWithValue("@tableId", tableId);
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
+        /* public static void UpdateTableItems(int tableId, int totalItems)
+         {
+             using (SQLiteConnection connection = new SQLiteConnection(ConnectionString))
+             {
+                 connection.Open();
+                 string updateQuery = "UPDATE sync_opentable SET ot_total = @totalItems WHERE ot_id = @tableId";
+                 using (SQLiteCommand command = new SQLiteCommand(updateQuery, connection))
+                 {
+                     command.Parameters.AddWithValue("@totalItems", totalItems);
+                     command.Parameters.AddWithValue("@tableId", tableId);
+                     command.ExecuteNonQuery();
+                 }
+             }
+         }*/
 
     }
 }

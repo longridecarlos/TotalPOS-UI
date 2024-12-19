@@ -13,5 +13,7 @@ namespace OpenTable.Models
         public DateTime CreatedAt { get; set; }
         public double Total { get; set; }
         public int TotalArt {  get; set; }
+        public string Code { get; set; }
+        public bool IsOpen { get; set; }
     }
 }

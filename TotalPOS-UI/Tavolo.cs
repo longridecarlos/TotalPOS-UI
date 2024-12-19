@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 using OpenTable.Models;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace TotalPOS_UI
 {
@@ -21,48 +20,48 @@ namespace TotalPOS_UI
         {
             SelectedTable = selectedTable;
 
-            // Mostrar el nombre de la mesa en lbTitulo
+            // Show the name of the table in the label
             lbTitulo.Text = SelectedTable.Name;
 
-            // Cargar los productos de la mesa desde la base de datos
+            // Load the products of the table from the database
             LoadProductsInTable();
         }
 
         private void LoadProductsInTable()
         {
-            // Limpiar el ListView antes de cargar los productos
+            // Clean te ListView before load the products
             listViewTavolos.Items.Clear();
 
-            // Obtener los productos de la base de datos para la mesa seleccionada
+            // Get the products from the database of the selected table
             productsInTable = OpenTable.Database.GetTableProducts(SelectedTable.Id);
 
-            // Cargar productos en el ListView
+            // Load products in the ListView
             foreach (var product in productsInTable)
             {
                 var item = new ListViewItem(product.Quantity.ToString());
                 item.SubItems.Add(product.Name);
                 item.SubItems.Add(product.Price.ToString("F2"));
                 item.SubItems.Add(product.GetTotal().ToString("F2"));
-                item.SubItems.Add(""); // Columna para checkbox
+                //item.Tag=product;
 
-                item.Checked = false; // Inicialmente desmarcado
+                item.Checked = false; // Initially unchecked
                 listViewTavolos.Items.Add(item);
             }
 
-            // Insertar la fila vacía solo si hay productos
+            // Insert the empty row only if there are products
             if (productsInTable.Count > 0)
             {
                 var emptyRow = new ListViewItem("");
                 listViewTavolos.Items.Add(emptyRow);
             }
 
-            // Actualizar el total general en el ListView
+            // Update the total in the listView
             UpdateTotalRow();
         }
 
         private void UpdateLv()
         {
-            // Limpiar el ListView y recargar los productos
+            // Clean the ListView and reaload the products
             listViewTavolos.Items.Clear();
 
             foreach (var product in productsInTable)
@@ -71,43 +70,42 @@ namespace TotalPOS_UI
                 item.SubItems.Add(product.Name);
                 item.SubItems.Add(product.Price.ToString("F2"));
                 item.SubItems.Add(product.GetTotal().ToString("F2"));
-                item.SubItems.Add(""); // Columna para checkbox
 
-                item.Checked = false; // Inicialmente desmarcado
+                item.Checked = false; // Initially unchecked
                 listViewTavolos.Items.Add(item);
             }
 
-            // Insertar una fila vacía entre productos y total solo si hay productos
+            // Insert an empty row between products and total if there are products
             if (productsInTable.Count > 0)
             {
                 var emptyRow = new ListViewItem("");
                 listViewTavolos.Items.Add(emptyRow);
             }
 
-            // Actualizar el total general en el ListView
+            // Update the total general in the List View
             UpdateTotalRow();
         }
 
         private void UpdateTotalRow()
         {
-            // Calcular el total general de todos los productos
+            // Calculate the total general of the products
             double total = productsInTable.Sum(p => p.GetTotal());
 
-            // Revisar si ya existe una fila de total en el ListView
+            // Check if a total row exists
             var totalRow = listViewTavolos.Items.Cast<ListViewItem>()
                 .FirstOrDefault(item => item.SubItems[0].Text == "Total");
 
             if (totalRow != null)
             {
-                // Si ya existe, actualizar el total
+                // If exists, update the total
                 totalRow.SubItems[3].Text = total.ToString("F2");
             }
             else
             {
-                // Si no existe, agregar una nueva fila de total
+                // If not exists, add a new row
                 var totalItem = new ListViewItem("Total");
-                totalItem.SubItems.Add(""); // Dejar la columna de cantidad vacía
-                totalItem.SubItems.Add(""); // Dejar la columna de precio vacía
+                totalItem.SubItems.Add(""); // Let the column of quantity empty
+                totalItem.SubItems.Add(""); // Let the column of price empty
                 totalItem.SubItems.Add(total.ToString("F2")); // Total general
                 listViewTavolos.Items.Add(totalItem);
             }
@@ -118,44 +116,115 @@ namespace TotalPOS_UI
             string productName = "Coca Cola";
             double productPrice = 4.00;
 
-            // Buscar si ya existe una Coca Cola en la lista
+            // Search if there is a Coca Cola in the list
             var existingProduct = productsInTable.FirstOrDefault(p => p.Name == productName);
             if (existingProduct != null)
             {
-                // Si ya existe, incrementar la cantidad
+                // If it's already exists increase one
                 existingProduct.Quantity += 1;
             }
             else
             {
-                // Si no existe, lo agregamos
+                // If doesn't exists, we add it
                 productsInTable.Add(new Product { Name = productName, Price = productPrice, Quantity = 1 });
             }
 
-            // Actualizar el ListView
+            // Update the ListView
             UpdateLv();
+
+            try
+            {
+                // Current products are removed from the database first
+                OpenTable.Database.DeleteTableProducts(SelectedTable.Id);
+
+                // Then we add each product to the database
+                foreach (var product in productsInTable)
+                {
+                    OpenTable.Database.AddItemToTable(SelectedTable.Id, product, product.Quantity);
+                }
+
+                // Calculate the total of the table
+                double total = productsInTable.Sum(p => p.GetTotal());
+
+                int numberOfProducts = 0;
+                foreach (ListViewItem item in listViewTavolos.Items)
+                {
+                    if (int.TryParse(item.SubItems[0].Text, out int value)) // Convert to number
+                    {
+                        numberOfProducts += value;
+                    }
+                }
+
+                // Save the total
+                OpenTable.Database.UpdateTableTotal(SelectedTable.Id, total);
+                OpenTable.Database.UpdateTableTotalArt(SelectedTable.Id, numberOfProducts);
+
+            }
+            catch (Exception ex)
+            {
+                // If there is any error, display the error message
+                MessageBox.Show($"Errore durante il salvataggio dell'ordine: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
 
         private void btnPizza_Click(object sender, EventArgs e)
         {
             string productName = "Pizza";
             double productPrice = 15.00;
 
-            // Buscar si ya existe una Pizza en la lista
+            // Search if a Pizza already exists in the list
             var existingProduct = productsInTable.FirstOrDefault(p => p.Name == productName);
             if (existingProduct != null)
             {
-                // Si ya existe, incrementar la cantidad
+                // If it already exists, increase the amount
                 existingProduct.Quantity += 1;
             }
             else
             {
-                // Si no existe, lo agregamos
+                // If it doesn't exist, we add it
                 productsInTable.Add(new Product { Name = productName, Price = productPrice, Quantity = 1 });
             }
 
-            // Actualizar el ListView
+            // Update the ListView
             UpdateLv();
+
+            try
+            {
+                // Current products are first deleted from the database.
+                OpenTable.Database.DeleteTableProducts(SelectedTable.Id);
+
+                // Then we add each one to the database
+                foreach (var product in productsInTable)
+                {
+                    OpenTable.Database.AddItemToTable(SelectedTable.Id, product, product.Quantity);
+                }
+
+                // Calculate the total of the table
+                double total = productsInTable.Sum(p => p.GetTotal());
+
+                int numberOfProducts = 0;
+                foreach (ListViewItem item in listViewTavolos.Items)
+                {
+                    if (int.TryParse(item.SubItems[0].Text, out int value)) // Try to convert to number
+                    {
+                        numberOfProducts += value; // Add if it is a valid number
+                    }
+                }
+
+                // Save total
+                OpenTable.Database.UpdateTableTotal(SelectedTable.Id, total);
+                OpenTable.Database.UpdateTableTotalArt(SelectedTable.Id, numberOfProducts);
+
+
+            }
+            catch (Exception ex)
+            {
+                // If there is any error, display the error message
+                MessageBox.Show($"Errore durante il salvataggio dell'ordine: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
 
         public delegate void TableRemovedEventHandler(int tableId);
         public event TableRemovedEventHandler TableRemoved;
@@ -165,7 +234,7 @@ namespace TotalPOS_UI
             double totalToPay = 0;
             bool anyProductSelected = false;
 
-            // Verificamos si se ha marcado el total o un producto
+            // We check if the total or a product has been marked
             foreach (ListViewItem item in listViewTavolos.Items)
             {
                 if (item.Checked && item.SubItems[0].Text == "Total")
@@ -188,23 +257,23 @@ namespace TotalPOS_UI
 
             if (!anyProductSelected)
             {
-                MessageBox.Show("No has seleccionado ningún producto para pagar.", "Error de pago", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Non hai selezionato nessun prodotto da pagare.", "Errore di pagamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (totalToPay == 0.00)
             {
-                MessageBox.Show("La cuenta no puede ser cero.", "Error de pago", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Il conteggio non può essere zero.", "Errore di pagamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var confirmResult = MessageBox.Show($"¿Estás seguro que deseas pagar un total de CHF {totalToPay:F2}?", "Confirmar pago", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var confirmResult = MessageBox.Show($"¿Sei sicuro di voler pagare un totale di CHF {totalToPay:F2}?", "Conferma il pagamento", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (confirmResult == DialogResult.Yes)
             {
                 try
                 {
-                    // Eliminar los productos de la base de datos y de la lista de productos
+                    // Delete products from the database and product list
                     foreach (ListViewItem item in listViewTavolos.Items)
                     {
                         if (item.Checked && item.SubItems[0].Text != "Total")
@@ -226,111 +295,148 @@ namespace TotalPOS_UI
                             OpenTable.Database.DeleteProduct(product.Id);
                         }
                         productsInTable.Clear();
-                        OpenTable.Database.DeleteTable(SelectedTable.Id); // Eliminar la mesa
+                        //OpenTable.Database.DeleteTable(SelectedTable.Id); // Delete table
+                        OpenTable.Database.UpdateIsOpen(SelectedTable.Id);
                     }
 
                     UpdateLv();
 
                     if (productsInTable.Count == 0)
                     {
-                        MessageBox.Show("La mesa ha sido eliminada porque no quedan productos.", "Mesa eliminada", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                        // Notificar al formulario Main que la mesa ha sido eliminada
+                        // Notify the Main form that the table has been deleted
                         TableRemoved?.Invoke(SelectedTable.Id);
 
                         this.Close();
                     }
 
-                    MessageBox.Show("El pago se ha realizado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Il pagamento è stato effettuato correttamente.", "Successo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error al procesar el pago: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show($"Errore durante l'elaborazione del pagamento: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             else
             {
-                MessageBox.Show("Pago cancelado.", "Cancelado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Pagamento annullato.", "Annullato", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
         private void btnSalvare_Click(object sender, EventArgs e)
         {
-            try
+            /*try
             {
-                // Primero se borran los productos actuales de la base de datos
+                // Current products are first deleted from the database.
                 OpenTable.Database.DeleteTableProducts(SelectedTable.Id);
 
-                // Luego, agregamos cada uno a la base de datos
+                // Then we add each one to the database
                 foreach (var product in productsInTable)
                 {
                     OpenTable.Database.AddItemToTable(SelectedTable.Id, product, product.Quantity);
                 }
 
-                // Calcular el total de la mesa
+                // Calculate the total of the table
                 double total = productsInTable.Sum(p => p.GetTotal());
 
                 int numberOfProducts = 0;
                 foreach (ListViewItem item in listViewTavolos.Items)
                 {
-                    if (int.TryParse(item.SubItems[0].Text, out int value)) // Intenta convertir a número
+                    if (int.TryParse(item.SubItems[0].Text, out int value)) // Try to convert to number
                     {
-                        numberOfProducts += value; // Sumar si es un número válido
+                        numberOfProducts += value; // Add if it is a valid number
                     }
                 }
 
 
-                //Guardar total
+                // Save total
                 OpenTable.Database.UpdateTableTotal(SelectedTable.Id, total);
-                MessageBox.Show(total.ToString());
-                OpenTable.Database.UpdateTableItems(SelectedTable.Id, numberOfProducts);
+                OpenTable.Database.UpdateTableTotalArt(SelectedTable.Id, numberOfProducts);
 
 
-                // Mensaje de todo bien
+                // Message of all good
                 MessageBox.Show("Ordine salvato con successo.", "Successo", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
 
-                // Cerrar
+                // Close
                 this.Close();
             }
             catch (Exception ex)
             {
-                // Si hay algún error, mostrar el mensaje de error
-                MessageBox.Show($"Error al guardar el pedido: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+                // If there is any error, display the error message
+                MessageBox.Show($"Errore durante il salvataggio dell'ordine: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }*/
         }
 
         private void btnRimuovi_Click(object sender, EventArgs e)
         {
-            // Verificar si se ha seleccionado un producto en el ListView
+            // Check if a product has been selected in the ListView
             if (listViewTavolos.SelectedItems.Count > 0)
             {
-                // Obtener el item seleccionado
+                // Get the selected item
                 var selectedItem = listViewTavolos.SelectedItems[0];
 
-                // Obtener el nombre del producto
+                // Get the name of the product
                 string productName = selectedItem.SubItems[1].Text;
 
-                // Buscar el producto en la lista de productos de la mesa
+                // Get the product name
                 var productToRemove = productsInTable.FirstOrDefault(p => p.Name == productName);
 
                 if (productToRemove != null)
                 {
-                    // Si el producto tiene más de una unidad, disminuir la cantidad
+                    // If the product has more than one unit, decrease the quantity
                     if (productToRemove.Quantity > 1)
                     {
                         productToRemove.Quantity -= 1;
                     }
                     else
                     {
-                        // Si solo tiene una unidad, eliminar el producto de la lista
+                        // If you only have one unit, remove the product from the list
                         productsInTable.Remove(productToRemove);
                     }
 
-                    // Actualizar el ListView
+                    // Update the ListView
                     UpdateLv();
+                    try
+                    {
+                        // Current products are removed from the database first
+                        OpenTable.Database.DeleteTableProducts(SelectedTable.Id);
+
+                        // Then we add each product to the database
+                        foreach (var product in productsInTable)
+                        {
+                            OpenTable.Database.AddItemToTable(SelectedTable.Id, product, product.Quantity);
+                        }
+
+                        // Calculate the total of the table
+                        double total = productsInTable.Sum(p => p.GetTotal());
+
+                        int numberOfProducts = 0;
+                        foreach (ListViewItem item in listViewTavolos.Items)
+                        {
+                            if (int.TryParse(item.SubItems[0].Text, out int value)) // Convert to number
+                            {
+                                numberOfProducts += value;
+                            }
+                        }
+
+                        // Save the total
+                        OpenTable.Database.UpdateTableTotal(SelectedTable.Id, total);
+                        OpenTable.Database.UpdateTableTotalArt(SelectedTable.Id, numberOfProducts);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        // If there is any error, display the error message
+                        MessageBox.Show($"Errore durante il salvataggio dell'ordine: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
+            else
+            {
+                // If no item has been selected, display the alert message
+                MessageBox.Show("Seleziona un prodotto da eliminare.", "Avvertimento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
+
     }
 }
